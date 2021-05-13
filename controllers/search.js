@@ -18,7 +18,6 @@ axiosRetry(axios, {
 const router = express.Router();
 
 router.get("/", function (req, res) {
-  streamTweets();
   res.send("Twitter Enterprise API Search Application");
 });
 

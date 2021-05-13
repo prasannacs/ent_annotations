@@ -6,9 +6,6 @@ const config = require('../config.js');
 const fas_svcs = require('.././services/fas-bq.js');
 
 var ruleCategory;
-
-const bearerToken = 'Bearer AAAAAAAAAAAAAAAAAAAAAN1GKgEAAAAAPJSDmoI8hY9vB6ZgxeBgU9OVSrM%3DMRUYjL7LktexG7QAMMy0UaCkfYmVzEIyi1juXQePwADiMBkjFE'
-
 axiosRetry(axios, {
   retries: 3,
   retryDelay: axiosRetry.exponentialDelay,

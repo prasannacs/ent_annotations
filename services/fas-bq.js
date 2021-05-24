@@ -1,18 +1,13 @@
 const { BigQuery } = require("@google-cloud/bigquery");
-
-const projectId = "twttr-des-sa-demo-dev";
-const datasetId = "Annotations";
-const table = "fas_results";
-
+const config = require('../config.js');
 
 async function insertRowsAsStream(tableId, rows) {
   const bigqueryClient = new BigQuery();
-
   // Insert data into a table
   try {
     const result = await new Promise((resolve, reject) => {
       bigqueryClient
-        .dataset(datasetId)
+        .dataset(config.gcp_bq_datasetId)
         .table(tableId)
         .insert(rows)
         .then((results) => {
@@ -29,7 +24,20 @@ async function insertRowsAsStream(tableId, rows) {
   }
 }
 
-async function insertResults(results, category) {
+async function insertFollowers(followers, category) {
+  var followersRow = [];
+  followers.forEach( function ( follower, index)  {
+    followersRow.push({
+      category: category,
+      user_id: follower.id,
+      name: follower.name,
+      username: follower.username
+    });
+  });
+  insertRowsAsStream(config.followers_table, followersRow);
+}
+
+async function insertResults(results, reqBody) {
   var resultRows = [];
   results.forEach(function (tweet, index) {
     //console.log('FAS Response -- ', tweet);
@@ -60,11 +68,11 @@ async function insertResults(results, category) {
       }
 
       var cDate = new Date(tweet.created_at);
-      resultRows.push({
+      let row = {
         id: tweet.id,
         id_str: tweet.id_str,
         text: tweet.text,
-        category: category,
+        category: reqBody.handle,
         reply_settings: tweet.reply_settings,
         source: tweet.source,
         author_id: tweet.author_id,
@@ -82,14 +90,20 @@ async function insertResults(results, category) {
         retweet_count: tweet.retweet_count,
         favorite_count: tweet.favorite_count,
         entities: entitiesVar,
-      //  withheld: tweet.withheld,
         user: tweet.user,
         tweet_url: 'http://twitter.com/twitter/status/'+tweet.id_str
-      });
+      };
+      if( reqBody.discriminator != null && reqBody.discriminator === config.follower_discriminator)  {
+        row.follower_handle = reqBody.followerHandle;
+      }
+      resultRows.push(row);
     }
   });
 
-  insertRowsAsStream(table, resultRows);
+  let resultsTable = config.results_table;
+  if( reqBody.discriminator != null && reqBody.discriminator === config.follower_discriminator)
+    resultsTable = config.followers_tweet_table;
+  insertRowsAsStream(resultsTable, resultRows);
 }
 
-module.exports = { insertResults };
+module.exports = { insertResults, insertFollowers };

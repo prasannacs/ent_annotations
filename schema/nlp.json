@@ -1,0 +1,77 @@
+[
+    {
+        "name": "id_str",
+        "type": "STRING"
+    },
+    {
+        "name": "sentiment_magnitude",
+        "type": "FLOAT"
+    },
+    {
+        "name": "sentiment_score",
+        "type": "FLOAT"
+    },
+    {
+        "name": "entities",
+        "type": "RECORD",
+        "mode": "REPEATED",
+        "fields": [
+            {
+                "name": "name",
+                "type": "STRING"
+            },
+            {
+                "name": "type",
+                "type": "STRING"
+            },
+            {
+                "name": "metadata",
+                "type": "RECORD",
+                "fields": [
+                    {
+                        "name": "mid",
+                        "type": "STRING"
+                    },
+                    {
+                        "name": "wikipedia_url",
+                        "type": "STRING"
+                    }
+                ]
+            },
+            {
+                "name": "salience",
+                "type": "FLOAT"
+            },
+            {
+                "name": "mentions",
+                "type": "RECORD",
+                "mode": "REPEATED",
+                "fields": [
+                    {
+                        "name": "text",
+                        "type": "STRING"
+                    },
+                    {
+                        "name": "type",
+                        "type": "STRING"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "categories",
+        "type": "RECORD",
+        "mode": "REPEATED",
+        "fields": [
+            {
+                "name": "name",
+                "type": "STRING"
+            },
+            {
+                "name": "confidence",
+                "type": "FLOAT"
+            }
+        ]
+    }
+]

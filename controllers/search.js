@@ -4,6 +4,7 @@ const axios = require("axios").default;
 const axiosRetry = require("axios-retry");
 const config = require('../config.js');
 const fas_svcs = require('.././services/fas-bq.js');
+const pub_sub = require('.././services/pub-sub.js');
 
 var ruleCategory;
 axiosRetry(axios, {
@@ -23,11 +24,35 @@ router.get("/", function (req, res) {
 
 
 router.post("/fas", function (req, res) {
-  fullArchiveSearch(req.body).then(function (response) {
-    res.status(200).send(response);
-    followers(req.body.handle);
-  });
+  setupMsgInfra(req.body.category).then(function (value) {
+    console.log('Value ', value);
+    if (value != null) {
+      req.body.topicName = value;
+      fullArchiveSearch(req.body).then(function (response) {
+        res.status(200).send(response);
+        //followers(req.body.handle);
+      });
+    }
+  })
+
 });
+
+async function setupMsgInfra(category) {
+  return new Promise(function (resolve, reject) {
+    let topicName = config.nlp_topic + '_' + category;
+    let subscriptionName = topicName + '_' + 'subscription';
+    pub_sub.createTopic(topicName).then(() => {
+      console.log('Topic created ', topicName);
+      pub_sub.createSubscription(topicName, subscriptionName).then(() => {
+        console.log('Subscription created ', subscriptionName);
+        resolve(topicName);
+        pub_sub.listenForMessages(topicName, subscriptionName);
+      });
+    });
+
+  })
+
+}
 
 async function searchTweetsFollowers(params) {
   var query = { "query": "from:" + params.followerHandle, "maxResults": 500, fromDate: "201905010000", toDate: "202105200000" }
@@ -45,7 +70,7 @@ async function searchTweetsFollowers(params) {
     axios(axiosConfig)
       .then(function (resp) {
         if (resp != null) {
-          console.log('followers search results ',resp.data.results.length);
+          console.log('followers search results ', resp.data.results.length);
           fas_svcs.insertResults(resp.data.results, params);
           resolve({ "message": "Query result persisted" });
         }
@@ -61,7 +86,9 @@ async function fullArchiveSearch(reqBody, nextToken) {
   var handle = reqBody.handle;
   if (handle == undefined || handle == null || handle == '')
     return ('Empty Twitter handle');
-  var query = { "query": "from:" + handle, "maxResults": 500, fromDate: "202101010000", toDate: "202105200000" }
+  //var query = { "query": "from:" + handle + " lang:en", "maxResults": 500, fromDate: "202105010000", toDate: "202105300000" }
+  var query = { "query": reqBody.query, "maxResults": 500, fromDate: "202106010000", toDate: "202106090000" }
+  //reqBody.handle = 'Doom Patrol Season 3'
   if (nextToken != undefined && nextToken != null)
     query.next = nextToken;
   return new Promise(function (resolve, reject) {
@@ -80,6 +107,8 @@ async function fullArchiveSearch(reqBody, nextToken) {
         if (resp != null) {
           //console.log('response ',resp.data);
           fas_svcs.insertResults(resp.data.results, reqBody);
+          // publish to topic
+          publishTweets(resp.data.results, reqBody.category, reqBody.topicName);
           if (resp.data != undefined && resp.data.next != undefined) {
             fullArchiveSearch(reqBody, resp.data.next);
           }
@@ -90,18 +119,29 @@ async function fullArchiveSearch(reqBody, nextToken) {
         console.log('ERROR --- ', error);
         resolve(error);
       });
-      
+
+  });
+}
+
+async function publishTweets(tweets, category, topicName) {
+  console.log('publishing tweets ', tweets.length);
+  if (tweets === null || tweets.length < 1) {
+    console.log("Cannot publish empty Tweets array or Category is empty")
+    return;
+  }
+  tweets.forEach(function (tweet, index) {
+    pub_sub.publishTweet(topicName, tweet, category);
   });
 }
 
 async function persistFollowerTweets(followers, twitter_handle) {
-  followers.forEach( function ( follower, index)  {
-    console.log('persist followers ',index);
+  followers.forEach(function (follower, index) {
+    console.log('persist followers ', index);
     let params = {};
     params.handle = twitter_handle;
     params.followerHandle = follower.username;
     params.discriminator = config.follower_discriminator;
-    if( index < config.max_followers )
+    if (index < config.max_followers)
       searchTweetsFollowers(params);
   });
 }
@@ -128,7 +168,7 @@ async function followers(twitter_handle) {
           }
           console.log("2....");
 
-        resolve(followers);
+          resolve(followers);
         }
       })
       .catch(function (error) {

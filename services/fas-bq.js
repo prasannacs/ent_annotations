@@ -1,6 +1,5 @@
 const { BigQuery } = require("@google-cloud/bigquery");
 const config = require('../config.js');
-const pub_sub = require('./pub_sub');
 
 async function insertRowsAsStream(tableId, rows) {
   const bigqueryClient = new BigQuery();
@@ -73,7 +72,7 @@ async function insertResults(results, reqBody) {
         id: tweet.id,
         id_str: tweet.id_str,
         text: tweet.text,
-        category: reqBody.handle,
+        category: reqBody.category,
         reply_settings: tweet.reply_settings,
         source: tweet.source,
         author_id: tweet.author_id,
@@ -99,7 +98,7 @@ async function insertResults(results, reqBody) {
       }
       resultRows.push(row);
       // publish to topic
-      pub_sub.publishTweet(row);
+      //pub_sub.publishTweet(row);
     }
   });
 
@@ -109,4 +108,4 @@ async function insertResults(results, reqBody) {
   insertRowsAsStream(resultsTable, resultRows);
 }
 
-module.exports = { insertResults, insertFollowers };
+module.exports = { insertResults, insertFollowers, insertRowsAsStream };

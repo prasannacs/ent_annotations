@@ -1,17 +1,42 @@
-const {PubSub} = require('@google-cloud/pubsub');
-const {v1} = require('@google-cloud/pubsub');
+const { PubSub } = require('@google-cloud/pubsub');
+const { v1 } = require('@google-cloud/pubsub');
 const fas_bq = require('./fas-bq');
 const config = require('../config.js');
+const google_nlp = require('./google-nlp');
 
 const pubSubClient = new PubSub();
 
-async function publishTweet(tweet)  {
-    let message = {
-      id: tweet.id_str,
-      text: tweet.text
-    }
-    publishMessage(config.nlp_topic, JSON.stringify(message));
+async function publishTweet(topicName, tweet, category) {
+  let message = {
+    id: tweet.id_str,
+    text: tweet.text,
+    category: category
   }
+  publishMessage(topicName, JSON.stringify(message));
+}
+
+async function createTopic(topicName) {
+  // Creates a new topic
+  await pubSubClient.createTopic(topicName);
+  console.log(`Topic ${topicName} created.`);
+}
+
+async function deleteTopic(topicName) {
+  await pubSubClient.topic(topicName).delete();
+  console.log(`Topic ${topicName} deleted.`);
+}
+
+async function createSubscription(topicName,subscriptionName) {
+  // Creates a new subscription
+  await pubSubClient.topic(topicName).createSubscription(subscriptionName);
+  console.log(`Subscription ${subscriptionName} created.`);
+}
+
+async function deleteSubscription(subscriptionName) {
+  // Deletes the subscription
+  await pubSubClient.subscription(subscriptionName).delete();
+  console.log(`Subscription ${subscriptionName} deleted.`);
+}
 
 async function publishMessage(topicName, message) {
   // Publishes the message as a string, e.g. "Hello, world!" or JSON.stringify(someObject)
@@ -28,21 +53,21 @@ async function publishMessage(topicName, message) {
 
 const timeout = 60;
 
-async function listenForMessages(subscriptionName) {
-  // References an existing subscription
+async function listenForMessages(topicName, subscriptionName) {
+  console.log('PubSub-listenForMessages-subscription ',subscriptionName);
   const subscription = pubSubClient.subscription(subscriptionName);
-
-  // Create an event handler to handle messages
+  var tweets = [];
   let messageCount = 0;
   const messageHandler = message => {
-    console.log(`Received message ${message.id}:`);
-    //console.log(`\tData: ${message.data}`);
-    //console.log(`\tAttributes: ${message.attributes}`);
+    // console.log(`Received message ${message.id}:`);
+    // console.log(`\tData: ${message.data}`);
+    // console.log(`\tAttributes: ${message.attributes}`);
+    tweets.push(JSON.parse(message.data));
     messageCount += 1;
-
     // "Ack" (acknowledge receipt of) the message
     message.ack();
   };
+  console.log('PubSub-listenForMessages- ',tweets.length);
 
   // Listen for new messages until timeout is hit
   subscription.on('message', messageHandler);
@@ -50,7 +75,10 @@ async function listenForMessages(subscriptionName) {
   setTimeout(() => {
     subscription.removeListener('message', messageHandler);
     console.log(`${messageCount} message(s) received.`);
-  }, timeout * 100000);
+    google_nlp.annotateText(tweets);
+    deleteSubscription(subscriptionName);
+    deleteTopic(topicName);
+  }, timeout * 1000);
 }
 
 // Creates a client; cache this for further use.
@@ -71,7 +99,7 @@ async function synchronousPull(projectId, subscriptionName, maxMessagesToPull) {
 
   // The subscriber pulls a specified number of messages.
   const [response] = await subClient.pull(request);
-  console.log('Subscription response ',response);
+  //console.log('Subscription response ',response);
 
   // Process the messages.
   const ackIds = [];
@@ -79,11 +107,10 @@ async function synchronousPull(projectId, subscriptionName, maxMessagesToPull) {
 
   for (const message of response.receivedMessages) {
     //console.log('Received Message :- ',message.message.data.toString());
-    //tweets.push(JSON.parse(message.message.data.toString()));
+    tweets.push(JSON.parse(message.message.data.toString()));
     ackIds.push(message.ackId);
   }
 
-  console.log('Tweets pulled -- ',tweets.length);
   // Insert into BQ
   //await insertResults(tweets,'cash');
 
@@ -94,12 +121,11 @@ async function synchronousPull(projectId, subscriptionName, maxMessagesToPull) {
       subscription: formattedSubscription,
       ackIds: ackIds,
     };
-
     await subClient.acknowledge(ackRequest);
   }
-
   console.log('Done.');
+  return tweets;
 }
 
-module.exports = { listenForMessages, synchronousPull, publishTweet };
+module.exports = { listenForMessages, synchronousPull, publishTweet, createTopic, deleteTopic, createSubscription, deleteSubscription };
 

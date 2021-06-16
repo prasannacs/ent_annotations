@@ -3,6 +3,7 @@ const { v1 } = require('@google-cloud/pubsub');
 const fas_bq = require('./fas-bq');
 const config = require('../config.js');
 const google_nlp = require('./google-nlp');
+const watson_nlp = require('./watson-nlp');
 
 const pubSubClient = new PubSub();
 
@@ -26,7 +27,7 @@ async function deleteTopic(topicName) {
   console.log(`Topic ${topicName} deleted.`);
 }
 
-async function createSubscription(topicName,subscriptionName) {
+async function createSubscription(topicName, subscriptionName) {
   // Creates a new subscription
   await pubSubClient.topic(topicName).createSubscription(subscriptionName);
   console.log(`Subscription ${subscriptionName} created.`);
@@ -53,8 +54,8 @@ async function publishMessage(topicName, message) {
 
 const timeout = 60;
 
-async function listenForMessages(topicName, subscriptionName) {
-  console.log('PubSub-listenForMessages-subscription ',subscriptionName);
+async function listenForMessages(topicName, subscriptionName, discriminator) {
+  console.log('PubSub-listenForMessages-subscription ', subscriptionName);
   const subscription = pubSubClient.subscription(subscriptionName);
   var tweets = [];
   let messageCount = 0;
@@ -67,7 +68,7 @@ async function listenForMessages(topicName, subscriptionName) {
     // "Ack" (acknowledge receipt of) the message
     message.ack();
   };
-  console.log('PubSub-listenForMessages- ',tweets.length);
+  console.log('PubSub-listenForMessages- ', tweets.length);
 
   // Listen for new messages until timeout is hit
   subscription.on('message', messageHandler);
@@ -75,9 +76,13 @@ async function listenForMessages(topicName, subscriptionName) {
   setTimeout(() => {
     subscription.removeListener('message', messageHandler);
     console.log(`${messageCount} message(s) received.`);
-    google_nlp.annotateText(tweets);
+    if (discriminator === 'GCP')
+      google_nlp.annotateText(tweets);
+    if (discriminator === 'WATSON')
+      watson_nlp.analyze(tweets);
+
     deleteSubscription(subscriptionName);
-    deleteTopic(topicName);
+    //deleteTopic(topicName);
   }, timeout * 1000);
 }
 

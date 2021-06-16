@@ -2,6 +2,7 @@ const language = require('@google-cloud/language');
 const config = require('../config.js');
 const pub_sub = require('./pub-sub.js');
 const fas_bq = require('./fas-bq');
+const utils = require('./utils');
 
 async function pullTweets() {
     console.log('subscription name ', config.nlp_messages_to_pull);
@@ -58,7 +59,7 @@ async function annotateText(tweets) {
             sentiment_score: sentiment.score,
             entities: entityRowArr
         }
-        if (countWords(tweet.text) >= 20) {
+        if (utils.countWords(tweet.text) >= 20) {
             var catRowArr = [];
             const [classification] = await client.classifyText({ document });
             classification.categories.forEach(category => {
@@ -77,7 +78,7 @@ async function annotateText(tweets) {
 
         nlpRows.push(nlpRow);
         console.log('GNLP Annotated -- ',tweet.category,' row', nlpRows.length, ' tweet ',nlpRow.id_str );
-        sleep(1000);
+        utils.sleep(1000);
     }
     console.log('nlpRows ', nlpRows.length);
     // split array and insert 500 rows into BQ
@@ -95,21 +96,6 @@ async function annotateText(tweets) {
         }
     }
     //fas_bq.insertRowsAsStream(config.nlp_bq_table, nlpRows);
-}
-
-function sleep(milliseconds) {
-    const date = Date.now();
-    let currentDate = null;
-    do {
-        currentDate = Date.now();
-    } while (currentDate - date < milliseconds);
-}
-
-function countWords(str) {
-    str = str.replace(/(^\s*)|(\s*$)/gi, "");
-    str = str.replace(/[ ]{2,}/gi, " ");
-    str = str.replace(/\n /, "\n");
-    return str.split(' ').length;
 }
 
 module.exports = { annotateText, pullTweets };

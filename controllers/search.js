@@ -45,9 +45,16 @@ async function setupMsgInfra(category) {
       console.log('Topic created ', topicName);
       pub_sub.createSubscription(topicName, subscriptionName).then(() => {
         console.log('Subscription created ', subscriptionName);
-        resolve(topicName);
-        pub_sub.listenForMessages(topicName, subscriptionName);
+        //resolve(topicName);
+        pub_sub.listenForMessages(topicName, subscriptionName, "GCP");
       });
+      let watsonSubscriptionName = topicName + '_' + 'watson_subs'
+      pub_sub.createSubscription(topicName, watsonSubscriptionName).then(() => {
+        console.log('Subscription created ', watsonSubscriptionName);
+        //resolve(topicName);
+        pub_sub.listenForMessages(topicName, watsonSubscriptionName, "WATSON");
+      });
+      resolve(topicName);
     });
 
   })
@@ -87,7 +94,7 @@ async function fullArchiveSearch(reqBody, nextToken) {
   if (handle == undefined || handle == null || handle == '')
     return ('Empty Twitter handle');
   //var query = { "query": "from:" + handle + " lang:en", "maxResults": 500, fromDate: "202105010000", toDate: "202105300000" }
-  var query = { "query": reqBody.query, "maxResults": 500, fromDate: "202106010000", toDate: "202106090000" }
+  var query = { "query": reqBody.query, "maxResults": 500, fromDate: "202106010000", toDate: "202106160000" }
   //reqBody.handle = 'Doom Patrol Season 3'
   if (nextToken != undefined && nextToken != null)
     query.next = nextToken;
@@ -105,10 +112,12 @@ async function fullArchiveSearch(reqBody, nextToken) {
     axios(axiosConfig)
       .then(function (resp) {
         if (resp != null) {
-          //console.log('response ',resp.data);
-          fas_svcs.insertResults(resp.data.results, reqBody);
-          // publish to topic
-          publishTweets(resp.data.results, reqBody.category, reqBody.topicName);
+          console.log('Search results into BQ and Publish into Topics');
+          if( resp.data.results.length > 0 )  {
+            fas_svcs.insertResults(resp.data.results, reqBody);
+            // publish to topic
+            publishTweets(resp.data.results, reqBody.category, reqBody.topicName);
+          }
           if (resp.data != undefined && resp.data.next != undefined) {
             fullArchiveSearch(reqBody, resp.data.next);
           }

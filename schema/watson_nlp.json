@@ -1,0 +1,220 @@
+[
+    {
+        "name": "id_str",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "result",
+        "type": "RECORD",
+        "fields": [
+            {
+                "name": "usage",
+                "type": "RECORD",
+                "fields": [
+                    {
+                        "name": "text_units",
+                        "type": "INTEGER",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "text_characters",
+                        "type": "INTEGER",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "features",
+                        "type": "INTEGER",
+                        "mode": "NULLABLE"
+                    }
+                ],
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "language",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "keywords",
+                "type": "RECORD",
+                "mode": "REPEATED",
+                "fields": [
+                    {
+                        "name": "text",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "sentiment",
+                        "type": "RECORD",
+                        "fields": [
+                            {
+                                "name": "score",
+                                "type": "FLOAT",
+                                "mode": "NULLABLE"
+                            },
+                            {
+                                "name": "label",
+                                "type": "STRING",
+                                "mode": "NULLABLE"
+                            },
+                            {
+                                "name": "mixed",
+                                "type": "FLOAT"
+                            }
+                        ],
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "relevance",
+                        "type": "FLOAT",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "emotion",
+                        "type": "RECORD",
+                        "fields": [
+                            {
+                                "name": "sadness",
+                                "type": "FLOAT",
+                                "mode": "NULLABLE"
+                            },
+                            {
+                                "name": "joy",
+                                "type": "FLOAT",
+                                "mode": "NULLABLE"
+                            },
+                            {
+                                "name": "fear",
+                                "type": "FLOAT",
+                                "mode": "NULLABLE"
+                            },
+                            {
+                                "name": "disgust",
+                                "type": "FLOAT",
+                                "mode": "NULLABLE"
+                            },
+                            {
+                                "name": "anger",
+                                "type": "FLOAT",
+                                "mode": "NULLABLE"
+                            }
+                        ],
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "count",
+                        "type": "INTEGER",
+                        "mode": "NULLABLE"
+                    }
+                ]
+            },
+            {
+                "name": "entities",
+                "type": "RECORD",
+                "mode": "REPEATED",
+                "fields": [
+                    {
+                        "name": "type",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "text",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "sentiment",
+                        "type": "RECORD",
+                        "fields": [
+                            {
+                                "name": "score",
+                                "type": "FLOAT",
+                                "mode": "NULLABLE"
+                            },
+                            {
+                                "name": "label",
+                                "type": "STRING",
+                                "mode": "NULLABLE"
+                            }
+                        ],
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "relevance",
+                        "type": "FLOAT",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "emotion",
+                        "type": "RECORD",
+                        "fields": [
+                            {
+                                "name": "sadness",
+                                "type": "FLOAT",
+                                "mode": "NULLABLE"
+                            },
+                            {
+                                "name": "joy",
+                                "type": "FLOAT",
+                                "mode": "NULLABLE"
+                            },
+                            {
+                                "name": "fear",
+                                "type": "FLOAT",
+                                "mode": "NULLABLE"
+                            },
+                            {
+                                "name": "disgust",
+                                "type": "FLOAT",
+                                "mode": "NULLABLE"
+                            },
+                            {
+                                "name": "anger",
+                                "type": "FLOAT",
+                                "mode": "NULLABLE"
+                            }
+                        ],
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "confidence",
+                        "type": "FLOAT",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "count",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "disambiguation",
+                        "type": "RECORD",
+                        "fields": [
+                            {
+                                "name": "name",
+                                "type": "STRING",
+                                "mode": "NULLABLE"
+                            },
+                            {
+                                "name": "dbpedia_resource",
+                                "type": "STRING",
+                                "mode": "NULLABLE"
+                            },
+                            {
+                                "name": "subtype",
+                                "type": "STRING",
+                                "fields": [],
+                                "mode": "REPEATED"
+                            }
+                        ],
+                        "mode": "NULLABLE"
+                    }
+                ]
+            }
+        ],
+        "mode": "NULLABLE"
+    }
+]

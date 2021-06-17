@@ -11,8 +11,9 @@ const pub_sub = require('../services/pub-sub.js');
 const router = express.Router();
 
 router.get("/", function (req, res) {
-    //pub_sub.listenForMessages(config.nlp_subscription);
-    watson_svcs.analyze();
+  console.log(req.body);
+  pub_sub.listenForMessages(req.body.topicName, req.body.subscriptionName, req.body.discriminator);
+  //watson_svcs.analyze();
   res.send("Twitter Enterprise API NLP Application");
 });
 

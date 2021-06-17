@@ -65,6 +65,7 @@ async function insertResults(results, reqBody) {
           entitiesVar.hashtags = [];
         //if (tweet.entities.media === undefined)
           entitiesVar.media = [];
+          entitiesVar.symbols = [];
       }
 
       var cDate = new Date(tweet.created_at);
@@ -82,7 +83,7 @@ async function insertResults(results, reqBody) {
         in_reply_to_user_id: tweet.in_reply_to_user_id,
         in_reply_to_screen_name: tweet.in_reply_to_screen_name,
         possibly_sensitive: tweet.possibly_sensitive,
-        geo: geoVar,
+        //geo: geoVar,
         favorited: tweet.favorited,
         retweeted: tweet.retweeted,
         quote_count: tweet.quote_count,

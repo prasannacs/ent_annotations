@@ -28,37 +28,38 @@ async function annotateText(tweets) {
             content: tweet.text,
             type: 'PLAIN_TEXT',
         };
-        const [result] = await client.annotateText({ document: document, features: features });
-        const sentiment = result.documentSentiment;
-        const entities = result.entities;
+        var nlpRow = {};
+        // const [result] = await client.annotateText({ document: document, features: features }); 
+        await client.annotateText({ document: document, features: features })
+            .then( result => {  
+                //console.log('result - GNLP ',JSON.stringify(result));
+                let sentiment = result[0].documentSentiment;
+                let entities = result[0].entities;
+                var entityRowArr = [];
+        
+                entities.forEach(entity => {
+                    var entityRow = {};
+                    entityRow.name = entity.name;
+                    entityRow.type = entity.type;
+                    entityRow.salience = entity.salience;
+                    if (entity.metadata && entity.metadata.wikipedia_url) {
+                        entityRow.metadata = {};
+                        entityRow.metadata.wikipedia_url = entity.metadata.wikipedia_url;
+                    }
+                    entityRowArr.push(entityRow);
+                });
+                nlpRow = {
+                    id_str: tweet.id,
+                    sentiment_magnitude: sentiment.magnitude,
+                    sentiment_score: sentiment.score,
+                    entities: entityRowArr
+                }
+            })
+            .catch(err => {
+                console.log('error:', err);
+                //return;
+            })
 
-        // console.log(`Text: ${tweet.text}`);
-        // console.log(`result: ${result}`);
-        // console.log(`Sentiment score: ${sentiment.score}`);
-        // console.log(`Sentiment magnitude: ${sentiment.magnitude}`);
-        // console.log('Entities:');
-        var entityRowArr = [];
-
-        entities.forEach(entity => {
-            var entityRow = {};
-            entityRow.name = entity.name;
-            entityRow.type = entity.type;
-            entityRow.salience = entity.salience;
-            // console.log(entity.name);
-            // console.log(` - Type: ${entity.type}, Salience: ${entity.salience}`);
-            if (entity.metadata && entity.metadata.wikipedia_url) {
-                // console.log(` - Wikipedia URL: ${entity.metadata.wikipedia_url}`);
-                entityRow.metadata = {};
-                entityRow.metadata.wikipedia_url = entity.metadata.wikipedia_url;
-            }
-            entityRowArr.push(entityRow);
-        });
-        let nlpRow = {
-            id_str: tweet.id,
-            sentiment_magnitude: sentiment.magnitude,
-            sentiment_score: sentiment.score,
-            entities: entityRowArr
-        }
         if (utils.countWords(tweet.text) >= 20) {
             var catRowArr = [];
             const [classification] = await client.classifyText({ document });
@@ -67,7 +68,6 @@ async function annotateText(tweets) {
                     var catRow = {};
                     catRow.name = category.name;
                     catRow.confidence = category.confidence;
-                    // console.log(`Name: ${category.name}, Confidence: ${category.confidence}`);
                     catRowArr.push(catRow);
                 }
             });
@@ -77,25 +77,30 @@ async function annotateText(tweets) {
         }
 
         nlpRows.push(nlpRow);
-        console.log('GNLP Annotated -- ',tweet.category,' row', nlpRows.length, ' tweet ',nlpRow.id_str );
+        console.log('Google NLP Annotated -- ',tweet.category,' row', nlpRows.length, ' tweet ',nlpRow.id_str );
+        if( nlpRows.length > 9 )   {
+            fas_bq.insertRowsAsStream(config.nlp_bq_table,nlpRows);
+            nlpRows = []
+        }
         utils.sleep(1000);
     }
-    console.log('nlpRows ', nlpRows.length);
+    console.log('Insert remaining nlpRows ', nlpRows.length);
+    if( nlpRows.length > 0)
+        fas_bq.insertRowsAsStream(config.nlp_bq_table,nlpRows);
     // split array and insert 500 rows into BQ
-    var len = nlpRows.length;
-    var maxRowsToChuck = 10;
-    if (len > maxRowsToChuck) {
-        let bqIndex = (len - (len % maxRowsToChuck)) / maxRowsToChuck
-        console.log('bqIndex ', bqIndex);
-        while (bqIndex > 0) {
-            fas_bq.insertRowsAsStream(config.nlp_bq_table, nlpRows.slice((bqIndex - 1) * maxRowsToChuck, bqIndex * maxRowsToChuck));
-            if (bqIndex == 1)   {
-                fas_bq.insertRowsAsStream(config.nlp_bq_table, nlpRows.slice((len-(len % maxRowsToChuck))-1, len));
-            }
-            bqIndex--;
-        }
-    }
-    //fas_bq.insertRowsAsStream(config.nlp_bq_table, nlpRows);
+    // var len = nlpRows.length;
+    // var maxRowsToChuck = 10;
+    // if (len > maxRowsToChuck) {
+    //     let bqIndex = (len - (len % maxRowsToChuck)) / maxRowsToChuck
+    //     console.log('bqIndex ', bqIndex);
+    //     while (bqIndex > 0) {
+    //         fas_bq.insertRowsAsStream(config.nlp_bq_table, nlpRows.slice((bqIndex - 1) * maxRowsToChuck, bqIndex * maxRowsToChuck));
+    //         if (bqIndex == 1)   {
+    //             fas_bq.insertRowsAsStream(config.nlp_bq_table, nlpRows.slice((len-(len % maxRowsToChuck))-1, len));
+    //         }
+    //         bqIndex--;
+    //     }
+    // }
 }
 
 module.exports = { annotateText, pullTweets };

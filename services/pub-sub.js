@@ -68,8 +68,6 @@ async function listenForMessages(topicName, subscriptionName, discriminator) {
     // "Ack" (acknowledge receipt of) the message
     message.ack();
   };
-  console.log('PubSub-listenForMessages- ', tweets.length);
-
   // Listen for new messages until timeout is hit
   subscription.on('message', messageHandler);
 

@@ -74,6 +74,7 @@ async function insertResults(results, reqBody) {
         id_str: tweet.id_str,
         text: tweet.text,
         category: reqBody.category,
+        subcategory: reqBody.subCategory,
         reply_settings: tweet.reply_settings,
         source: tweet.source,
         author_id: tweet.author_id,
@@ -98,8 +99,6 @@ async function insertResults(results, reqBody) {
         row.follower_handle = reqBody.followerHandle;
       }
       resultRows.push(row);
-      // publish to topic
-      //pub_sub.publishTweet(row);
     }
   });
 

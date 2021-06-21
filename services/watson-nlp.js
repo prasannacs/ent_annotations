@@ -70,20 +70,6 @@ async function analyze(tweets) {
     }
     console.log('Remaining watsonRows ', watsonRows.length);
     fas_bq.insertRowsAsStream(config.watson_nlp_bq_table, watsonRows);
-    // split array and insert 500 rows into BQ
-    // var len = watsonRows.length;
-    // var maxRowsToChuck = 10;
-    // if (len > maxRowsToChuck) {
-    //     let bqIndex = (len - (len % maxRowsToChuck)) / maxRowsToChuck
-    //     console.log('watson bqIndex ', bqIndex);
-    //     while (bqIndex > 0) {
-    //         fas_bq.insertRowsAsStream(config.watson_nlp_bq_table, watsonRows.slice((bqIndex - 1) * maxRowsToChuck, bqIndex * maxRowsToChuck));
-    //         if (bqIndex == 1) {
-    //             fas_bq.insertRowsAsStream(config.watson_nlp_bq_table, watsonRows.slice((len - (len % maxRowsToChuck)) - 1, len));
-    //         }
-    //         bqIndex--;
-    //     }
-    // }
 }
 
 module.exports = { analyze, pullTweets };

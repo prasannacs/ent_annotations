@@ -24,7 +24,7 @@ router.get("/", function (req, res) {
 
 
 router.post("/fas", function (req, res) {
-  setupMsgInfra(req.body.category).then(function (value) {
+  setupMsgInfra(req.body).then(function (value) {
     console.log('Value ', value);
     if (value != null) {
       req.body.topicName = value;
@@ -37,8 +37,14 @@ router.post("/fas", function (req, res) {
 
 });
 
-async function setupMsgInfra(category) {
+async function setupMsgInfra(requestBody) {
+  var category = requestBody.category;
+  var nlpSwitch = requestBody.nlp;
   return new Promise(function (resolve, reject) {
+    if( nlpSwitch === false)  {
+      resolve('NLP setup skipped');
+      return;
+    }
     let topicName = config.nlp_topic + '_' + category;
     let subscriptionName = topicName + '_' + 'subscription';
     pub_sub.createTopic(topicName).then(() => {
@@ -90,12 +96,9 @@ async function searchTweetsFollowers(params) {
 }
 
 async function fullArchiveSearch(reqBody, nextToken) {
-  var handle = reqBody.handle;
-  if (handle == undefined || handle == null || handle == '')
-    return ('Empty Twitter handle');
-  //var query = { "query": "from:" + handle + " lang:en", "maxResults": 500, fromDate: "202105010000", toDate: "202105300000" }
-  var query = { "query": reqBody.query, "maxResults": 500, fromDate: "202106100000", toDate: "202106160000" }
-  //reqBody.handle = 'Doom Patrol Season 3'
+  // validate requestBody before Search
+  var nlpSwitch = reqBody.nlp;
+  var query = { "query": reqBody.query, "maxResults": 500, fromDate: "202103010000", toDate: "202106160000" }
   if (nextToken != undefined && nextToken != null)
     query.next = nextToken;
   return new Promise(function (resolve, reject) {
@@ -116,7 +119,8 @@ async function fullArchiveSearch(reqBody, nextToken) {
           if( resp.data != null && resp.data.results != null && resp.data.results.length > 0 )  {
             fas_svcs.insertResults(resp.data.results, reqBody);
             // publish to topic
-            publishTweets(resp.data.results, reqBody.category, reqBody.topicName);
+            if( nlpSwitch === true )
+              publishTweets(resp.data.results, reqBody.category, reqBody.topicName);
           }
           if (resp.data != undefined && resp.data.next != undefined) {
             fullArchiveSearch(reqBody, resp.data.next);

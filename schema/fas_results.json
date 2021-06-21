@@ -20,6 +20,11 @@
         "mode": "NULLABLE"
     },
     {
+        "name": "subcategory",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
         "name": "reply_settings",
         "type": "STRING",
         "mode": "NULLABLE"

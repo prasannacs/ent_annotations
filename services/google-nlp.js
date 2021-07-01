@@ -14,7 +14,7 @@ async function pullTweets() {
     }
 }
 
-async function annotateText(tweets) {
+async function annotateText(dataSetName, tweets) {
     const client = new language.LanguageServiceClient();
     const features = {
         //"extractSyntax": true,
@@ -79,14 +79,14 @@ async function annotateText(tweets) {
         nlpRows.push(nlpRow);
         console.log('Google NLP Annotated -- ',tweet.category,' row', nlpRows.length, ' tweet ',nlpRow.id_str );
         if( nlpRows.length > 9 )   {
-            fas_bq.insertRowsAsStream(config.nlp_bq_table,nlpRows);
+            fas_bq.insertRowsAsStream(dataSetName, config.nlp_bq_table,nlpRows);
             nlpRows = []
         }
         utils.sleep(1000);
     }
     console.log('Insert remaining nlpRows ', nlpRows.length);
     if( nlpRows.length > 0)
-        fas_bq.insertRowsAsStream(config.nlp_bq_table,nlpRows);
+        fas_bq.insertRowsAsStream(dataSetName, config.nlp_bq_table,nlpRows);
 }
 
 module.exports = { annotateText, pullTweets };

@@ -54,7 +54,7 @@ async function publishMessage(topicName, message) {
 
 const timeout = 60;
 
-async function listenForMessages(topicName, subscriptionName, discriminator) {
+async function listenForMessages(dataSetName, topicName, subscriptionName, discriminator) {
   console.log('PubSub-listenForMessages-subscription ', subscriptionName);
   const subscription = pubSubClient.subscription(subscriptionName);
   var tweets = [];
@@ -75,12 +75,12 @@ async function listenForMessages(topicName, subscriptionName, discriminator) {
     subscription.removeListener('message', messageHandler);
     console.log(`${messageCount} message(s) received.`);
     if (discriminator === 'GCP')
-      google_nlp.annotateText(tweets);
+      google_nlp.annotateText(dataSetName, tweets);
     if (discriminator === 'WATSON')
-      watson_nlp.analyze(tweets);
+      watson_nlp.analyze(dataSetName, tweets);
 
     deleteSubscription(subscriptionName);
-    //deleteTopic(topicName);
+    deleteTopic(topicName);
   }, timeout * 1000);
 }
 
@@ -130,5 +130,39 @@ async function synchronousPull(projectId, subscriptionName, maxMessagesToPull) {
   return tweets;
 }
 
-module.exports = { listenForMessages, synchronousPull, publishTweet, createTopic, deleteTopic, createSubscription, deleteSubscription };
+async function setupMsgInfra(requestBody) {
+  var nlpObj = requestBody.naturalLanguage;
+  var category = requestBody.fullArchiveSearch.category;
+  var nlpSwitch = nlpObj.on;
+  var dataSetName = requestBody.dataSet.dataSetName;
+  return new Promise(function (resolve, reject) {
+    if (nlpSwitch === false) {
+      resolve('NLP setup skipped');
+      return;
+    }
+    let topicName = config.nlp_topic + '_' + dataSetName + '_' + category;
+    let subscriptionName = topicName + '_' + 'subscription';
+    createTopic(topicName).then(() => {
+      console.log('Topic created ', topicName);
+      if (nlpObj.googleSvc === true) {
+        createSubscription(topicName, subscriptionName).then(() => {
+          console.log('Subscription created ', subscriptionName);
+          //resolve(topicName);
+          listenForMessages(dataSetName, topicName, subscriptionName, "GCP");
+        });
+      } if (nlpObj.watsonSvc === true) {
+        let watsonSubscriptionName = topicName + '_' + 'watson_subs'
+        createSubscription(topicName, watsonSubscriptionName).then(() => {
+          console.log('Subscription created ', watsonSubscriptionName);
+          //resolve(topicName);
+          listenForMessages(dataSetName, topicName, watsonSubscriptionName, "WATSON");
+        });
+      }
+      resolve(topicName);
+    });
+
+  })
+
+}
+module.exports = { listenForMessages, synchronousPull, publishTweet, createTopic, deleteTopic, createSubscription, deleteSubscription, setupMsgInfra };
 

@@ -26,7 +26,7 @@ async function pullTweets() {
     }
 }
 
-async function analyze(tweets) {
+async function analyze(dataSetName, tweets) {
     var watsonRows = [];
     for (let tweet of tweets) {
         if (utils.countWords(tweet.text) >= 5) {
@@ -62,14 +62,14 @@ async function analyze(tweets) {
                     console.log('error:', err);
                 });
                 if( watsonRows.length > 9 ) {
-                    fas_bq.insertRowsAsStream(config.watson_nlp_bq_table, watsonRows);
+                    fas_bq.insertRowsAsStream(dataSetName, config.watson_nlp_bq_table, watsonRows);
                     watsonRows = []
                 }
             utils.sleep(1000);
         }
     }
     console.log('Remaining watsonRows ', watsonRows.length);
-    fas_bq.insertRowsAsStream(config.watson_nlp_bq_table, watsonRows);
+    fas_bq.insertRowsAsStream(dataSetName, config.watson_nlp_bq_table, watsonRows);
 }
 
 module.exports = { analyze, pullTweets };

@@ -1,13 +1,13 @@
 const { BigQuery } = require("@google-cloud/bigquery");
 const config = require('../config.js');
 
-async function insertRowsAsStream(tableId, rows) {
+async function insertRowsAsStream(datasetId, tableId, rows) {
   const bigqueryClient = new BigQuery();
   // Insert data into a table
   try {
     const result = await new Promise((resolve, reject) => {
       bigqueryClient
-        .dataset(config.gcp_bq_datasetId)
+        .dataset(datasetId)
         .table(tableId)
         .insert(rows)
         .then((results) => {
@@ -73,8 +73,8 @@ async function insertResults(results, reqBody) {
         id: tweet.id,
         id_str: tweet.id_str,
         text: tweet.text,
-        category: reqBody.category,
-        subcategory: reqBody.subCategory,
+        category: reqBody.fullArchiveSearch.category,
+        subcategory: reqBody.fullArchiveSearch.subCategory,
         reply_settings: tweet.reply_settings,
         source: tweet.source,
         author_id: tweet.author_id,
@@ -105,7 +105,7 @@ async function insertResults(results, reqBody) {
   let resultsTable = config.results_table;
   if( reqBody.discriminator != null && reqBody.discriminator === config.follower_discriminator)
     resultsTable = config.followers_tweet_table;
-  insertRowsAsStream(resultsTable, resultRows);
+  insertRowsAsStream(reqBody.dataSet.dataSetName, resultsTable, resultRows);
 }
 
 module.exports = { insertResults, insertFollowers, insertRowsAsStream };

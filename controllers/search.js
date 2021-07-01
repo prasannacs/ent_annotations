@@ -5,6 +5,7 @@ const axiosRetry = require("axios-retry");
 const config = require('../config.js');
 const fas_svcs = require('.././services/fas-bq.js');
 const pub_sub = require('.././services/pub-sub.js');
+const bq_dataset = require('.././services/bq-dataset.js');
 
 var ruleCategory;
 axiosRetry(axios, {
@@ -22,50 +23,47 @@ router.get("/", function (req, res) {
   res.send("Twitter Enterprise API Search Application");
 });
 
+router.post("/fas/provisionDB", function (req, res) {
+  if (req.body.dataSet === null)
+    res.send("Invalid input params - Pass a valid JSON dataSet object");
+  if (req.body.dataSet.newDataSet === true) {
+    return new Promise(function (resolve, reject) {
+      bq_dataset.createDataSet(req.body.dataSet.dataSetName).then((dataSetResponse) => {
+        console.log('dataSetResponse ', dataSetResponse);
+        bq_dataset.createTables(req.body.dataSet.dataSetName).then((tablesResponse) => {
+          console.log('tablesResponse ', tablesResponse);
+          res.send(201, { 'status': 'Successfully provisioned DB' });
+        }).catch(function (error) {
+          console.log('Error provisioning tables ', error);
+          res.send(503, { "error": "Error Provisioning tables " });
+        });
+      }).catch(function (error) {
+        console.log('Error provisioning DB ', error);
+        res.send(503, { "error": "Error Provisioning DB " });
+      })
+    })
+
+  }
+});
 
 router.post("/fas", function (req, res) {
-  setupMsgInfra(req.body).then(function (value) {
-    console.log('Value ', value);
-    if (value != null) {
-      req.body.topicName = value;
-      fullArchiveSearch(req.body).then(function (response) {
-        res.status(200).send(response);
-        //followers(req.body.handle);
-      });
+  bq_dataset.provisionDB(req.body.dataSet).then(function (status) {
+    console.log('DB provisioning status ', status);
+    if (status != null && status.includes('Successfully provisioned')) {
+      pub_sub.setupMsgInfra(req.body).then(function (value) {
+        console.log('Value ', value);
+        if (value != null) {
+          req.body.topicName = value;
+          fullArchiveSearch(req.body).then(function (response) {
+            res.status(200).send(response);
+            //followers(req.body.handle);
+          });
+        }
+      })
     }
   })
 
 });
-
-async function setupMsgInfra(requestBody) {
-  var category = requestBody.category;
-  var nlpSwitch = requestBody.nlp;
-  return new Promise(function (resolve, reject) {
-    if( nlpSwitch === false)  {
-      resolve('NLP setup skipped');
-      return;
-    }
-    let topicName = config.nlp_topic + '_' + category;
-    let subscriptionName = topicName + '_' + 'subscription';
-    pub_sub.createTopic(topicName).then(() => {
-      console.log('Topic created ', topicName);
-      pub_sub.createSubscription(topicName, subscriptionName).then(() => {
-        console.log('Subscription created ', subscriptionName);
-        //resolve(topicName);
-        pub_sub.listenForMessages(topicName, subscriptionName, "GCP");
-      });
-      let watsonSubscriptionName = topicName + '_' + 'watson_subs'
-      pub_sub.createSubscription(topicName, watsonSubscriptionName).then(() => {
-        console.log('Subscription created ', watsonSubscriptionName);
-        //resolve(topicName);
-        pub_sub.listenForMessages(topicName, watsonSubscriptionName, "WATSON");
-      });
-      resolve(topicName);
-    });
-
-  })
-
-}
 
 async function searchTweetsFollowers(params) {
   var query = { "query": "from:" + params.followerHandle, "maxResults": 500, fromDate: "201905010000", toDate: "202105200000" }
@@ -97,8 +95,9 @@ async function searchTweetsFollowers(params) {
 
 async function fullArchiveSearch(reqBody, nextToken) {
   // validate requestBody before Search
-  var nlpSwitch = reqBody.nlp;
-  var query = { "query": reqBody.query, "maxResults": 500, fromDate: "202103010000", toDate: "202106160000" }
+  var nlpSwitch = reqBody.naturalLanguage.on;
+  var fas = reqBody.fullArchiveSearch;
+  var query = { "query": fas.query, "maxResults": 500, fromDate: fas.fromDate, toDate: fas.toDate }
   if (nextToken != undefined && nextToken != null)
     query.next = nextToken;
   return new Promise(function (resolve, reject) {
@@ -116,11 +115,11 @@ async function fullArchiveSearch(reqBody, nextToken) {
       .then(function (resp) {
         if (resp != null) {
           console.log('Search results into BQ and Publish into Topics');
-          if( resp.data != null && resp.data.results != null && resp.data.results.length > 0 )  {
+          if (resp.data != null && resp.data.results != null && resp.data.results.length > 0) {
             fas_svcs.insertResults(resp.data.results, reqBody);
             // publish to topic
-            if( nlpSwitch === true )
-              publishTweets(resp.data.results, reqBody.category, reqBody.topicName);
+            if (nlpSwitch === true)
+              publishTweets(resp.data.results, fas.category, reqBody.topicName);
           }
           if (resp.data != undefined && resp.data.next != undefined) {
             fullArchiveSearch(reqBody, resp.data.next);

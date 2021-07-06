@@ -54,7 +54,16 @@ async function publishMessage(topicName, message) {
 
 const timeout = 60;
 
-async function listenForMessages(dataSetName, topicName, subscriptionName, discriminator) {
+async function listenForMessages(requestBody, discriminator) {
+  let dataSetName = requestBody.dataSet.dataSetName;
+  let topicName = requestBody.naturalLanguage.topicName;
+  let subscriptionName;
+
+  if (discriminator === 'GCP')
+    subscriptionName = requestBody.naturalLanguage.google.subscriptionName;
+  if (discriminator === 'WATSON')
+    subscriptionName = requestBody.naturalLanguage.watson.subscriptionName;
+
   console.log('PubSub-listenForMessages-subscription ', subscriptionName);
   const subscription = pubSubClient.subscription(subscriptionName);
   var tweets = [];
@@ -74,10 +83,18 @@ async function listenForMessages(dataSetName, topicName, subscriptionName, discr
   setTimeout(() => {
     subscription.removeListener('message', messageHandler);
     console.log(`${messageCount} message(s) received.`);
-    if (discriminator === 'GCP')
+    if (discriminator === 'GCP')  {
+      let maxTweetsToAnnotate = requestBody.naturalLanguage.google.maxTweetsToAnnotate;
+      if( maxTweetsToAnnotate < tweets.length )
+        tweets = tweets.slice(0, maxTweetsToAnnotate);
       google_nlp.annotateText(dataSetName, tweets);
-    if (discriminator === 'WATSON')
+    }
+    if (discriminator === 'WATSON') {
+      let maxTweetsToAnnotate = requestBody.naturalLanguage.watson.maxTweetsToAnnotate;
+      if( maxTweetsToAnnotate < tweets.length )
+        tweets = tweets.slice(0, maxTweetsToAnnotate);
       watson_nlp.analyze(dataSetName, tweets);
+    }
 
     deleteSubscription(subscriptionName);
     deleteTopic(topicName);
@@ -144,18 +161,19 @@ async function setupMsgInfra(requestBody) {
     let subscriptionName = topicName + '_' + 'subscription';
     createTopic(topicName).then(() => {
       console.log('Topic created ', topicName);
-      if (nlpObj.googleSvc === true) {
+      requestBody.naturalLanguage.topicName = topicName;
+      if (nlpObj.google.googleSvc === true) {
         createSubscription(topicName, subscriptionName).then(() => {
           console.log('Subscription created ', subscriptionName);
-          //resolve(topicName);
-          listenForMessages(dataSetName, topicName, subscriptionName, "GCP");
+          requestBody.naturalLanguage.google.subscriptionName = subscriptionName;
+          listenForMessages(requestBody, 'GCP');
         });
-      } if (nlpObj.watsonSvc === true) {
+      } if (nlpObj.watson.watsonSvc === true) {
         let watsonSubscriptionName = topicName + '_' + 'watson_subs'
         createSubscription(topicName, watsonSubscriptionName).then(() => {
           console.log('Subscription created ', watsonSubscriptionName);
-          //resolve(topicName);
-          listenForMessages(dataSetName, topicName, watsonSubscriptionName, "WATSON");
+          requestBody.naturalLanguage.watson.subscriptionName = subscriptionName;
+          listenForMessages(requestBody, 'WATSON');
         });
       }
       resolve(topicName);

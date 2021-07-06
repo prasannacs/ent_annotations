@@ -47,12 +47,15 @@ async function createTables(datasetId) {
     const fas_schema = fs.readFileSync('./schema/fas_results.json');
     const nlp_schema = fs.readFileSync('./schema/nlp.json');
     const watson_nlp_schema = fs.readFileSync('./schema/watson_nlp.json');
+    const search_counts_schema = fs.readFileSync('./schema/fas_search_counts.txt','utf8');
     const [fas_table] = await bigquery.dataset(datasetId).createTable(config.bq.table.fas_results, { schema: JSON.parse(fas_schema), location: 'US' });
     console.log(`Table ${fas_table.id} created.`);
     const [nlp_table] = await bigquery.dataset(datasetId).createTable(config.bq.table.nlp, { schema: JSON.parse(nlp_schema), location: 'US' });
     console.log(`Table ${nlp_table.id} created.`);
     const [watson_nlp_table] = await bigquery.dataset(datasetId).createTable(config.bq.table.watson_nlp, { schema: JSON.parse(watson_nlp_schema), location: 'US' });
     console.log(`Table ${watson_nlp_table.id} created.`);
+    const [search_counts_table] = await bigquery.dataset(datasetId).createTable(config.bq.table.fas_search_counts, { schema: search_counts_schema.toString(), location: 'US' });
+    console.log(`Table ${search_counts_table.id} created.`);
 }
 
 module.exports = { createDataSet, createTables, provisionDB };

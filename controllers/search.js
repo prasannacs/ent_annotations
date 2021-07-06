@@ -57,6 +57,7 @@ router.post("/fas", function (req, res) {
           fullArchiveSearch(req.body).then(function (response) {
             res.status(200).send(response);
             //followers(req.body.handle);
+            fasSearchCounts(req.body, null);
           });
         }
       })
@@ -135,6 +136,45 @@ async function fullArchiveSearch(reqBody, nextToken) {
   });
 }
 
+async function fasSearchCounts(reqBody, nextToken) {
+  let fas = reqBody.fullArchiveSearch;
+  var query = {"query": fas.query ,"fromDate": fas.fromDate ,"toDate": fas.toDate, "bucket":"day"};
+  if( nextToken != undefined && nextToken != null ) {
+    query.next = nextToken;
+  }
+  console.log('fasSearchCounts query ',JSON.stringify(query));
+  return new Promise(function (resolve, reject) {
+    let axiosConfig = {
+      method: 'post',
+      url: config.fas_search_counts_url,
+      auth: {
+        username: config.gnip_username,
+        password: config.gnip_password
+      },
+      data: query
+    };
+    axios(axiosConfig)
+      .then(function (response) {
+        if (response != null) {
+          if( response.data.results != null)  {
+            fas_svcs.insertCountsResults(response.data.results, 'day', reqBody);
+            if( response.data.next != undefined && response.data.next != null )  {
+              fasSearchCounts(reqBody, response.data.next);
+            } else {
+              // do nothing and thread will gracefully die
+              console.log('search counts all done');
+            }
+          }
+          resolve(response.data);
+        }
+      })
+      .catch(function (error) {
+        console.log('ERROR --- ', error);
+        reject(error);
+      });
+  });
+}
+
 async function publishTweets(tweets, category, topicName) {
   console.log('publishing tweets ', tweets.length);
   if (tweets === null || tweets.length < 1) {
@@ -146,66 +186,5 @@ async function publishTweets(tweets, category, topicName) {
   });
 }
 
-async function persistFollowerTweets(followers, twitter_handle) {
-  followers.forEach(function (follower, index) {
-    console.log('persist followers ', index);
-    let params = {};
-    params.handle = twitter_handle;
-    params.followerHandle = follower.username;
-    params.discriminator = config.follower_discriminator;
-    if (index < config.max_followers)
-      searchTweetsFollowers(params);
-  });
-}
-
-async function followers(twitter_handle) {
-  console.log('in followers method');
-  let resp = await getUserIdByHandle(twitter_handle);
-  return new Promise(function (resolve, reject) {
-    console.log("1....");
-    let followsConfig = {
-      method: 'get',
-      url: 'https://api.twitter.com/2/users/' + resp.id + '/followers',
-      headers: { 'Authorization': config.twitter_bearer_token }
-    };
-    axios(followsConfig)
-      .then(function (response) {
-        if (response.data.data != null) {
-          let followers = response.data.data;
-          //console.log('followers -- ',followers);
-          if (followers != null && followers.length) {
-            console.log('insert followers');
-            fas_svcs.insertFollowers(followers, twitter_handle);
-            persistFollowerTweets(followers, twitter_handle)
-          }
-          console.log("2....");
-
-          resolve(followers);
-        }
-      })
-      .catch(function (error) {
-        reject(error);
-      });
-  });
-}
-
-async function getUserIdByHandle(twitter_handle) {
-  return new Promise(function (resolve, reject) {
-    let userConfig = {
-      method: 'get',
-      url: 'https://api.twitter.com/2/users/by/username/' + twitter_handle,
-      headers: { 'Authorization': config.twitter_bearer_token }
-    };
-    axios(userConfig)
-      .then(function (response) {
-        if (response.data.data != null) {
-          resolve(response.data.data);
-        }
-      })
-      .catch(function (error) {
-        reject(error);
-      });
-  });
-}
 
 module.exports = router;

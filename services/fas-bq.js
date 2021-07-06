@@ -108,4 +108,25 @@ async function insertResults(results, reqBody) {
   insertRowsAsStream(reqBody.dataSet.dataSetName, resultsTable, resultRows);
 }
 
-module.exports = { insertResults, insertFollowers, insertRowsAsStream };
+async function insertCountsResults(results, bucket, reqBody) {
+  var resultRows = [];
+  results.forEach(function (result, index) {
+    //console.log('FAS Response -- ', result);
+    if (result) {
+      var dateStr = result.timePeriod;
+      var tpDate = new Date(dateStr.substr(0,4),dateStr.substr(4,2),dateStr.substr(6,2),dateStr.substr(8,2),dateStr.substr(10,2));
+      //console.log('tpdate -- ',tpDate.toISOString());
+      resultRows.push({
+        timeperiod: BigQuery.datetime(tpDate.toISOString()),
+        results: result.count,
+        bucket: bucket,
+        category: reqBody.fullArchiveSearch.category,
+        subcategory: reqBody.fullArchiveSearch.subCategory
+      });
+    }
+  });
+
+  insertRowsAsStream(reqBody.dataSet.dataSetName, config.bq.table.fas_search_counts, resultRows);
+}
+
+module.exports = { insertResults, insertFollowers, insertRowsAsStream, insertCountsResults };

@@ -6,6 +6,7 @@ const config = require('../config.js');
 const fas_svcs = require('.././services/fas-bq.js');
 const pub_sub = require('.././services/pub-sub.js');
 const bq_dataset = require('.././services/bq-dataset.js');
+const utils = require('.././services/utils.js');
 
 var ruleCategory;
 axiosRetry(axios, {
@@ -22,6 +23,54 @@ const router = express.Router();
 router.get("/", function (req, res) {
   res.send("Twitter Enterprise API Search Application");
 });
+
+router.get("/followers", function (req, res) {
+  fas_svcs.queryBQTable(utils.getEngagementsSQL(req.body)).then((rows) => {
+    getFollowers(rows, req.body);
+  });
+  res.send('followers');
+});
+
+router.get("/followers/userprofiles", function (req, res) {
+  fas_svcs.queryBQTable(utils.getFollowsSQL(req.body)).then((rows) => {
+    getUserProfiles(rows, req.body);
+  });
+  res.send('user profiles');
+});
+
+async function getUserProfiles(tweets, reqBody) {
+  let topicName = config.user_profiles_topic + '_' + reqBody.dataSet.dataSetName + '_' + reqBody.fullArchiveSearch.category;
+
+  pub_sub.createTopic(topicName).then(() => {
+    let subscriptionName = topicName + 'sub';
+    reqBody.followers.topicName = topicName;
+    pub_sub.createSubscription(topicName, subscriptionName).then(() => {
+      console.log('User Profiles Subscription created ', subscriptionName);
+      reqBody.followers.subscriptionName = subscriptionName;
+      pub_sub.subscribeWithFlowControlSettings(reqBody, 4, 'userProfiles');
+      pub_sub.publishUserProfiles(tweets, reqBody.fullArchiveSearch.category, topicName);
+    });
+  }).catch(function (error) {
+    console.log('getFollowers topic creation error ', error);
+  })
+}
+
+async function getFollowers(tweets, reqBody) {
+  let topicName = config.followers_topic + '_' + reqBody.dataSet.dataSetName + '_' + reqBody.fullArchiveSearch.category;
+
+  pub_sub.createTopic(topicName).then(() => {
+    let subscriptionName = topicName + 'sub';
+    reqBody.followers.topicName = topicName;
+    pub_sub.createSubscription(topicName, subscriptionName).then(() => {
+      console.log('Followers Subscription created ', subscriptionName);
+      reqBody.followers.subscriptionName = subscriptionName;
+      pub_sub.subscribeWithFlowControlSettings(reqBody, 1, 'follows');
+      pub_sub.publishTweets(tweets, reqBody.fullArchiveSearch.category, topicName);
+    });
+  }).catch(function (error) {
+    console.log('getFollowers topic creation error ', error);
+  })
+}
 
 router.post("/fas/provisionDB", function (req, res) {
   if (req.body.dataSet === null)
@@ -56,7 +105,6 @@ router.post("/fas", function (req, res) {
           req.body.topicName = value;
           fullArchiveSearch(req.body).then(function (response) {
             res.status(200).send(response);
-            //followers(req.body.handle);
             fasSearchCounts(req.body, null);
           });
         }
@@ -66,37 +114,10 @@ router.post("/fas", function (req, res) {
 
 });
 
-async function searchTweetsFollowers(params) {
-  var query = { "query": "from:" + params.followerHandle, "maxResults": 500, fromDate: "201905010000", toDate: "202105200000" }
-  return new Promise(function (resolve, reject) {
-    let axiosConfig = {
-      method: 'post',
-      url: config.fas_search_followers_url,
-      auth: {
-        username: config.gnip_username,
-        password: config.gnip_password
-      },
-      data: query
-    };
-    console.log('follower search query ', JSON.stringify(query));
-    axios(axiosConfig)
-      .then(function (resp) {
-        if (resp != null) {
-          console.log('followers search results ', resp.data.results.length);
-          fas_svcs.insertResults(resp.data.results, params);
-          resolve({ "message": "Query result persisted" });
-        }
-      })
-      .catch(function (error) {
-        console.log('ERROR --- ', error);
-        resolve(error);
-      });
-  });
-}
-
 async function fullArchiveSearch(reqBody, nextToken) {
   // validate requestBody before Search
   var nlpSwitch = reqBody.naturalLanguage.on;
+  let mlSwitch = reqBody.machineLearning.on;
   var fas = reqBody.fullArchiveSearch;
   var query = { "query": fas.query, "maxResults": 500, fromDate: fas.fromDate, toDate: fas.toDate }
   if (nextToken != undefined && nextToken != null)
@@ -119,11 +140,22 @@ async function fullArchiveSearch(reqBody, nextToken) {
           if (resp.data != null && resp.data.results != null && resp.data.results.length > 0) {
             fas_svcs.insertResults(resp.data.results, reqBody);
             // publish to topic
-            if (nlpSwitch === true)
-              publishTweets(resp.data.results, fas.category, reqBody.topicName);
+            if (nlpSwitch === true || mlSwitch === true)  {
+              pub_sub.publishTweets(resp.data.results, fas.category, reqBody.topicName);
+              console.log('Tweets published to topic ',reqBody.topicName);
+            }
+              
           }
           if (resp.data != undefined && resp.data.next != undefined) {
             fullArchiveSearch(reqBody, resp.data.next);
+          } else {
+            // no next token - end of FAS insert followers
+            if (reqBody.followers.followers_graph === true) {
+              
+              fas_svcs.queryBQTable(utils.getEngagementsSQL(reqBody)).then((rows) => {
+                getFollowers(rows, reqBody);
+              });
+            }
           }
           resolve({ "message": "Query result persisted" });
         }
@@ -132,17 +164,16 @@ async function fullArchiveSearch(reqBody, nextToken) {
         console.log('ERROR --- ', error);
         resolve(error);
       });
-
   });
 }
 
 async function fasSearchCounts(reqBody, nextToken) {
   let fas = reqBody.fullArchiveSearch;
-  var query = {"query": fas.query ,"fromDate": fas.fromDate ,"toDate": fas.toDate, "bucket":"day"};
-  if( nextToken != undefined && nextToken != null ) {
+  var query = { "query": fas.query, "fromDate": fas.fromDate, "toDate": fas.toDate, "bucket": "day" };
+  if (nextToken != undefined && nextToken != null) {
     query.next = nextToken;
   }
-  console.log('fasSearchCounts query ',JSON.stringify(query));
+  console.log('fasSearchCounts query ', JSON.stringify(query));
   return new Promise(function (resolve, reject) {
     let axiosConfig = {
       method: 'post',
@@ -156,9 +187,9 @@ async function fasSearchCounts(reqBody, nextToken) {
     axios(axiosConfig)
       .then(function (response) {
         if (response != null) {
-          if( response.data.results != null)  {
+          if (response.data.results != null) {
             fas_svcs.insertCountsResults(response.data.results, 'day', reqBody);
-            if( response.data.next != undefined && response.data.next != null )  {
+            if (response.data.next != undefined && response.data.next != null) {
               fasSearchCounts(reqBody, response.data.next);
             } else {
               // do nothing and thread will gracefully die
@@ -174,17 +205,5 @@ async function fasSearchCounts(reqBody, nextToken) {
       });
   });
 }
-
-async function publishTweets(tweets, category, topicName) {
-  console.log('publishing tweets ', tweets.length);
-  if (tweets === null || tweets.length < 1) {
-    console.log("Cannot publish empty Tweets array or Category is empty")
-    return;
-  }
-  tweets.forEach(function (tweet, index) {
-    pub_sub.publishTweet(topicName, tweet, category);
-  });
-}
-
 
 module.exports = router;

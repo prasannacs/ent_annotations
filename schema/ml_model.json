@@ -1,0 +1,33 @@
+[
+    {
+        "name": "id_str",
+        "type": "STRING"
+    },
+    {
+        "name": "result",
+        "type": "RECORD",
+        "fields": [
+            {
+                "name": "label",
+                "type": "STRING"
+            },
+            {
+                "name": "confidences",
+                "type": "FLOAT"
+            },
+            {
+                "name": "ids",
+                "type": "STRING"
+            }
+        ],
+        "mode": "REPEATED"
+    },
+    {
+        "name": "model_name",
+        "type": "STRING"
+    },
+    {
+        "name": "model_id",
+        "type": "STRING"
+    }
+]

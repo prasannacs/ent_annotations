@@ -11,7 +11,7 @@ async function insertRowsAsStream(datasetId, tableId, rows) {
         .table(tableId)
         .insert(rows)
         .then((results) => {
-          console.log(`Inserted ${rows.length} rows`);
+          console.log(`Inserted ${rows.length} rows into ${tableId} for dataset ${datasetId}`);
           resolve(rows);
         })
         .catch((err) => {
@@ -24,17 +24,19 @@ async function insertRowsAsStream(datasetId, tableId, rows) {
   }
 }
 
-async function insertFollowers(followers, category) {
+async function insertFollowers(followers, reqBody) {
   var followersRow = [];
   followers.forEach( function ( follower, index)  {
     followersRow.push({
-      category: category,
+      category: reqBody.fullArchiveSearch.category,
+      subcategory: reqBody.fullArchiveSearch.subCategory,
+      parent_user_id: reqBody.followers.parentUserId,
       user_id: follower.id,
       name: follower.name,
       username: follower.username
     });
   });
-  insertRowsAsStream(config.followers_table, followersRow);
+  insertRowsAsStream(reqBody.dataSet.dataSetName , config.followers_table, followersRow);
 }
 
 async function insertResults(results, reqBody) {
@@ -129,4 +131,58 @@ async function insertCountsResults(results, bucket, reqBody) {
   insertRowsAsStream(reqBody.dataSet.dataSetName, config.bq.table.fas_search_counts, resultRows);
 }
 
-module.exports = { insertResults, insertFollowers, insertRowsAsStream, insertCountsResults };
+async function queryBQTable(sqlQuery)  {
+  const bigqueryClient = new BigQuery();
+
+    console.log('queryBQTable SQL ',sqlQuery);
+
+    const options = {
+      query: sqlQuery,
+      location: 'US',
+    };
+
+    const [rows] = await bigqueryClient.query(options);
+
+    console.log('Query Results:');
+    return rows;
+}
+
+async function insertUserProfiles(results, reqBody) {
+  let tweet = results[0]; // first row as user row
+  var resultRows = [];
+    //console.log('FAS Response -- ', tweet);
+    if (tweet) {
+      var cDate = new Date(tweet.created_at);
+      let row = {
+        category: reqBody.fullArchiveSearch.category,
+        subcategory: reqBody.fullArchiveSearch.subCategory,
+        id: tweet.user.id,
+        id_str: tweet.user.id_str,
+        name: tweet.user.name,
+        screen_name: tweet.user.screen_name,
+        location: tweet.user.location,
+        url: tweet.user.url,
+        description: tweet.user.description,
+        protected: tweet.user.protected,
+        verified: tweet.user.verified,
+        followers_count: tweet.user.followers_count,
+        friends_count: tweet.user.friends_count,
+        listed_count: tweet.user.listed_count,
+        favourites_count: tweet.user.favourites_count,
+        statuses_count: tweet.user.statuses_count,
+        created_at: tweet.user.created_at,
+        lang: tweet.user.lang,
+        following: tweet.user.following,
+        derived: tweet.user.derived,
+        time_zone: tweet.user.time_zone,
+        translator_type: tweet.user.translator_type,
+      };
+      resultRows.push(row);
+    }
+
+  let resultsTable = config.bq.table.users;
+  insertRowsAsStream(reqBody.dataSet.dataSetName, resultsTable, resultRows);
+}
+
+
+module.exports = { insertResults, insertFollowers, insertRowsAsStream, insertCountsResults, queryBQTable, insertUserProfiles };
